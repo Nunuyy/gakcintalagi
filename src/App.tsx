@@ -1,0 +1,1168 @@
+import {
+  ShoppingBag,
+  ShieldCheck,
+  MapPin,
+  Camera,
+  MessageSquare,
+  QrCode,
+  Leaf,
+  User,
+  ChevronLeft,
+  Star,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  Zap,
+  ShieldAlert,
+  Award,
+  Activity,
+  BarChart3,
+  Crosshair,
+  Search,
+  SlidersHorizontal,
+  Box,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Lock,
+} from "lucide-react";
+
+// --- MOCK DATA ---
+const MOCK_PRODUCTS = [
+  {
+    id: 1,
+    title: "Monitor Samsung 24 inch Bekas Skripsi",
+    price: 850000,
+    originalPrice: 1500000,
+    aiFairPrice: 900000,
+    condition: "90% Mulus",
+    seller: "Alya (FSRD)",
+    university: "Institut Teknologi Bandung",
+    image:
+      "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=500&q=80",
+    category: "Elektronik",
+    description:
+      "Jarang dipakai, cuma buat nugas akhir. Layar no dead pixel. Bonus kabel HDMI.",
+  },
+  {
+    id: 2,
+    title: "Jaket Denim Vintage 90s",
+    price: 120000,
+    originalPrice: 350000,
+    aiFairPrice: 150000,
+    condition: "Thrift - Very Good",
+    seller: "Rian (Fikom)",
+    university: "Universitas Padjadjaran",
+    image:
+      "https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?auto=format&fit=crop&w=500&q=80",
+    category: "Fashion",
+    description: "Warna masih pekat, kancing lengkap. Cocok buat ngampus.",
+  },
+  {
+    id: 3,
+    title: "Buku Kalkulus Edisi 9",
+    price: 50000,
+    originalPrice: 250000,
+    aiFairPrice: 60000,
+    condition: "Ada coretan stabilo",
+    seller: "Budi (FTMD)",
+    university: "Institut Teknologi Bandung",
+    image:
+      "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=500&q=80",
+    category: "Buku",
+    description: "Buku legendaris. Udah lulus matkulnya jadi dijual aja.",
+  },
+];
+
+const SAFE_ZONES = [
+  {
+    id: 1,
+    name: "Lobby Perpustakaan Pusat",
+    cctv: true,
+    crowd: "Tinggi",
+    lat: -6.89,
+    lng: 107.61,
+  },
+  {
+    id: 2,
+    name: "Kantin Asrama",
+    cctv: true,
+    crowd: "Sedang",
+    lat: -6.892,
+    lng: 107.615,
+  },
+  {
+    id: 3,
+    name: "Taman Rektorat",
+    cctv: false,
+    crowd: "Rendah",
+    lat: -6.895,
+    lng: 107.611,
+  },
+];
+
+const FOMOTicker = () => (
+  <div className="bg-emerald-500 text-white text-xs font-semibold py-1.5 overflow-hidden flex items-center relative z-40 shadow-md">
+    <div className="animate-[marquee_20s_linear_infinite] whitespace-nowrap flex items-center gap-6">
+      <span>🎉 Rian baru saja membeli Jaket Denim di Unpad!</span>
+      <span>🔥 3 orang sedang melihat Monitor Samsung di ITB.</span>
+      <span>♻️ Siska menghemat 5kg emisi karbon hari ini!</span>
+      <span>🎉 Rian baru saja membeli Jaket Denim di Unpad!</span>
+    </div>
+    <style>{`
+      @keyframes marquee {
+        0% { transform: translateX(100%); }
+        100% { transform: translateX(-100%); }
+      }
+      html { scroll-behavior: smooth; }
+      .hide-scrollbar::-webkit-scrollbar { display: none; }
+      .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    `}</style>
+  </div>
+);
+
+export default function GakCintaLagiApp() {
+  // Global State
+  const [user, setUser] = useState({
+    isVerified: false,
+    name: "Guest",
+    carbonSaved: 12.5,
+    waterSaved: 350,
+    balance: 0,
+    activeTx: null,
+  });
+
+  // UI States (Modals & Drawers)
+  const [activeProduct, setActiveProduct] = useState(null); // Drawer
+  const [negoBotOpen, setNegoBotOpen] = useState(false); // Nested Drawer
+  const [checkoutFlowStep, setCheckoutFlowStep] = useState(0); // 0: Closed, 1: Verify, 2: Checkout, 3: Success
+  const [qrScannerOpen, setQrScannerOpen] = useState(false); // Modal
+  const [activeAdminTab, setActiveAdminTab] = useState("admin"); // 'admin' | 'ops'
+
+  // Navigation Helper for smooth scroll
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const handleBuyClick = () => {
+    if (user.isVerified) {
+      setCheckoutFlowStep(2); // Skip to checkout
+    } else {
+      setCheckoutFlowStep(1); // Go to verify
+    }
+  };
+
+  const completeCheckout = (product, zone) => {
+    setUser((prev) => ({
+      ...prev,
+      activeTx: { product, zone, status: "Menunggu Bertemu" },
+    }));
+    setCheckoutFlowStep(3); // Success Screen
+    setTimeout(() => {
+      setCheckoutFlowStep(0);
+      setActiveProduct(null);
+      scrollToSection("dashboard-section");
+    }, 2500);
+  };
+
+  const completeQRScan = () => {
+    setQrScannerOpen(false);
+    setUser((prev) => ({
+      ...prev,
+      activeTx: { ...prev.activeTx, status: "Selesai" },
+    }));
+    alert(
+      "QR Tervalidasi! Dana escrow berhasil dilepaskan ke dompet penjual. Transaksi Aman & Selesai."
+    );
+  };
+
+  return (
+    <div className="max-w-md mx-auto bg-gray-50 min-h-screen relative shadow-2xl overflow-x-hidden font-sans border-x border-gray-200 pb-24">
+      {/* GLOBAL STICKY HEADER */}
+      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md shadow-sm rounded-b-3xl">
+        <FOMOTicker />
+        <div className="px-4 py-3 flex justify-between items-center">
+          <div
+            className="flex items-center gap-2 cursor-pointer"
+            onClick={() => scrollToSection("hero-section")}
+          >
+            <div className="bg-emerald-500 text-white p-1.5 rounded-lg shadow-sm shadow-emerald-500/30">
+              <Leaf size={18} />
+            </div>
+            <h1 className="font-extrabold text-xl tracking-tight text-gray-900">
+              gakcinta<span className="text-emerald-500">lagi.</span>
+            </h1>
+          </div>
+          <div className="flex gap-2">
+            <button className="bg-gray-100/80 p-2 rounded-full hover:bg-gray-200 transition">
+              <Search size={18} className="text-gray-600" />
+            </button>
+            <button
+              className="bg-gray-100/80 p-2 rounded-full relative hover:bg-gray-200 transition"
+              onClick={() => scrollToSection("dashboard-section")}
+            >
+              <User size={18} className="text-gray-600" />
+              {user.isVerified && (
+                <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></div>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 1: HERO & GEOLOCATOR */}
+      <section id="hero-section" className="px-4 pt-6 pb-2">
+        <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-3 rounded-2xl text-sm font-medium border border-emerald-100 shadow-sm animate-[fadeIn_0.5s_ease-out]">
+          <MapPin size={18} className="animate-pulse" />
+          <div className="flex-1">
+            <p className="text-xs text-emerald-600/80">Area Deteksi AI</p>
+            <span>
+              <strong className="text-emerald-800">
+                Institut Teknologi Bandung
+              </strong>{" "}
+              (2km)
+            </span>
+          </div>
+          <div className="bg-emerald-200 p-1.5 rounded-lg">
+            <ShieldCheck size={16} className="text-emerald-700" />
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 2: MARKET EXPLORER */}
+      <section id="market-section" className="px-4 mt-6">
+        <div className="flex justify-between items-end mb-4">
+          <div>
+            <h2 className="text-xl font-black text-gray-800">
+              Penemuan Hari Ini 🔥
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Barang bekas kampus terverifikasi
+            </p>
+          </div>
+          <button className="text-emerald-500 font-medium text-xs flex items-center bg-emerald-50 px-3 py-1.5 rounded-full">
+            <SlidersHorizontal size={12} className="mr-1" /> Filter
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {MOCK_PRODUCTS.map((product) => (
+            <div
+              key={product.id}
+              onClick={() => setActiveProduct(product)}
+              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer active:scale-95 transition-transform hover:shadow-md"
+            >
+              <div className="relative h-36">
+                <img
+                  src={product.image}
+                  alt={product.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute top-2 left-2 bg-white/95 backdrop-blur-sm px-2 py-1 rounded-md text-[9px] font-black text-gray-800 uppercase tracking-wider shadow-sm">
+                  {product.condition}
+                </div>
+              </div>
+              <div className="p-3">
+                <h3 className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug h-10">
+                  {product.title}
+                </h3>
+                <div className="mt-2">
+                  <p className="text-emerald-600 font-black text-sm">
+                    Rp {product.price.toLocaleString("id-ID")}
+                  </p>
+                  <p className="text-[10px] text-gray-400 line-through">
+                    Rp {product.originalPrice.toLocaleString("id-ID")}
+                  </p>
+                </div>
+                <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2 text-xs text-gray-600">
+                  <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-[10px]">
+                    {product.seller[0]}
+                  </div>
+                  <span className="truncate">{product.seller}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* SECTION 3: 3D VIRTUAL CLOSET (INLINE) */}
+      <section id="closet-section" className="mx-4 mt-10 mb-6">
+        <div className="bg-gray-900 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden h-[450px] flex flex-col">
+          <div className="relative z-10 flex justify-between items-start mb-6">
+            <div>
+              <h3 className="font-black text-lg mb-1 flex items-center gap-2">
+                <Box size={20} className="text-emerald-400" /> 3D Virtual Closet
+              </h3>
+              <p className="text-xs text-gray-400 w-5/6 leading-relaxed">
+                Geser area bawah ini untuk mengeksplorasi gaya teman kampusmu
+                secara interaktif.
+              </p>
+            </div>
+            <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+              Beta
+            </span>
+          </div>
+
+          {/* Interactive 3D Area Container */}
+          <div className="flex-1 relative perspective-[1000px] overflow-visible group cursor-grab active:cursor-grabbing">
+            {/* We use a simple horizontal scroll snap trick to simulate 3D rotation steps for single-file robust React without full 3D canvas libraries */}
+            <div className="absolute inset-0 flex items-center justify-center -translate-y-4">
+              <div className="relative w-40 h-56 transform-style-3d group-hover:rotate-y-[15deg] transition-transform duration-700">
+                <div className="absolute inset-0 bg-gray-800/80 border border-gray-700 rounded-2xl flex items-center justify-center text-gray-500 text-xs text-center p-4">
+                  Pusat
+                  <br />
+                  Lemari Alya
+                </div>
+
+                <div className="absolute inset-0 bg-white rounded-2xl shadow-2xl p-2.5 translate-z-[120px] rotate-y-[-15deg] transition-all duration-500 group-hover:translate-z-[140px]">
+                  <img
+                    src={MOCK_PRODUCTS[0].image}
+                    className="w-full h-32 object-cover rounded-xl mb-2"
+                    alt="item"
+                  />
+                  <h3 className="text-gray-900 font-bold text-[10px] line-clamp-1">
+                    {MOCK_PRODUCTS[0].title}
+                  </h3>
+                  <p className="text-emerald-600 font-black text-xs mt-0.5">
+                    Rp 850k
+                  </p>
+                </div>
+
+                <div className="absolute inset-0 bg-gray-100 rounded-2xl shadow-xl p-2.5 translate-z-[-60px] translate-x-[100px] rotate-y-[35deg] opacity-60 transition-all duration-500 group-hover:opacity-80">
+                  <img
+                    src={MOCK_PRODUCTS[1].image}
+                    className="w-full h-32 object-cover rounded-xl mb-2"
+                    alt="item"
+                  />
+                  <p className="text-emerald-600 font-black text-xs mt-1">
+                    Rp 120k
+                  </p>
+                </div>
+
+                <div className="absolute inset-0 bg-gray-100 rounded-2xl shadow-xl p-2.5 translate-z-[-60px] -translate-x-[100px] rotate-y-[-35deg] opacity-60 transition-all duration-500 group-hover:opacity-80">
+                  <img
+                    src={MOCK_PRODUCTS[2].image}
+                    className="w-full h-32 object-cover rounded-xl mb-2"
+                    alt="item"
+                  />
+                  <p className="text-emerald-600 font-black text-xs mt-1">
+                    Rp 50k
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 3D Simulation Controls (Visual Only for Mobile prototype) */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur px-4 py-2 rounded-full border border-gray-700/50">
+              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
+              <div className="text-[10px] text-gray-300 font-semibold tracking-wide flex gap-2 items-center">
+                <ChevronLeft size={14} /> SWIPE{" "}
+                <ChevronLeft className="rotate-180" size={14} />
+              </div>
+              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+        <style>{`
+          .perspective-\\[1000px\\] { perspective: 1000px; }
+          .transform-style-3d { transform-style: preserve-3d; }
+          .translate-z-\\[120px\\] { transform: translateZ(120px); }
+          .translate-z-\\[140px\\] { transform: translateZ(140px); }
+          .translate-z-\\[-60px\\] { transform: translateZ(-60px); }
+          .translate-x-\\[100px\\] { transform: translateX(100px); }
+          .-translate-x-\\[100px\\] { transform: translateX(-100px); }
+          .rotate-y-\\[-15deg\\] { transform: rotateY(-15deg); }
+          .rotate-y-\\[15deg\\] { transform: rotateY(15deg); }
+          .rotate-y-\\[35deg\\] { transform: rotateY(35deg); }
+          .rotate-y-\\[-35deg\\] { transform: rotateY(-35deg); }
+        `}</style>
+      </section>
+
+      {/* SECTION 4: USER DASHBOARD & JOURNEY */}
+      <section
+        id="dashboard-section"
+        className="px-4 mt-8 pb-8 border-b-8 border-gray-100"
+      >
+        <h2 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2">
+          <User size={20} className="text-emerald-500" /> Dasbor Mahasiswa
+        </h2>
+
+        {/* Profile Card */}
+        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-5 rounded-3xl shadow-lg relative overflow-hidden mb-5">
+          <div className="absolute top-0 right-0 p-4 opacity-20">
+            <ShieldCheck size={100} />
+          </div>
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="w-16 h-16 bg-white rounded-full p-1 relative shadow-inner">
+              <img
+                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`}
+                alt="avatar"
+                className="w-full h-full bg-emerald-100 rounded-full"
+              />
+              {user.isVerified && (
+                <div className="absolute bottom-0 right-0 bg-emerald-400 p-1 rounded-full border-2 border-white">
+                  <CheckCircle size={12} className="text-white" />
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="font-bold text-xl">{user.name}</h3>
+              <p className="text-xs text-emerald-100 mt-1 font-medium bg-black/20 px-2 py-1 rounded inline-block">
+                {user.isVerified
+                  ? "✓ Verified Student (ITB)"
+                  : "Belum Verifikasi"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3 bg-white/10 rounded-2xl p-3 backdrop-blur-sm border border-white/20">
+            <div>
+              <p className="text-[10px] text-emerald-100 uppercase tracking-wide">
+                Emisi Ditekan
+              </p>
+              <p className="font-black text-lg flex items-center gap-1">
+                <Leaf size={14} /> {user.carbonSaved} kg
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-emerald-100 uppercase tracking-wide">
+                Air Dihemat
+              </p>
+              <p className="font-black text-lg flex items-center gap-1">
+                <Box size={14} /> {user.waterSaved} L
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Transactions Area */}
+        <h3 className="font-bold text-gray-800 mb-3">
+          Transaksi Berjalan (Escrow)
+        </h3>
+        {user.activeTx ? (
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 relative overflow-hidden mb-4 transition-all">
+            {user.activeTx.status === "Selesai" && (
+              <div className="absolute inset-0 bg-white/90 backdrop-blur z-10 flex flex-col items-center justify-center animate-[fadeIn_0.3s_ease-out]">
+                <CheckCircle size={40} className="text-emerald-500 mb-2" />
+                <p className="font-bold text-gray-800">Transaksi Selesai</p>
+                <p className="text-xs text-gray-500">
+                  Dana telah diteruskan ke penjual.
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <span className="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-1 rounded-md uppercase animate-pulse">
+                  {user.activeTx.status}
+                </span>
+                <h4 className="font-bold text-sm mt-2">
+                  {user.activeTx.product.title}
+                </h4>
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                  <MapPin size={10} /> {user.activeTx.zone.name}
+                </p>
+              </div>
+              <span className="font-black text-emerald-600 text-sm">
+                Rp {user.activeTx.product.price.toLocaleString("id-ID")}
+              </span>
+            </div>
+
+            <div className="bg-blue-50 rounded-xl p-3 flex gap-3 items-center mb-4 border border-blue-100">
+              <ShieldCheck size={20} className="text-blue-500 flex-shrink-0" />
+              <p className="text-[10px] text-blue-800 font-medium leading-relaxed">
+                Dana diamankan Escrow. Temui penjual dan scan QR barang untuk
+                melepas dana.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setQrScannerOpen(true)}
+              className="w-full bg-emerald-500 text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 transition"
+            >
+              <QrCode size={16} /> Buka Scanner QR
+            </button>
+          </div>
+        ) : (
+          <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-3xl p-8 text-center text-gray-500 flex flex-col items-center justify-center">
+            <ShoppingBag size={32} className="mb-2 text-gray-400 opacity-50" />
+            <p className="text-sm font-semibold">Belum ada transaksi.</p>
+            <p className="text-xs mt-1">Eksplor barang kampusmu sekarang!</p>
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 5: BEHIND THE SCENES (ADMIN & OPS) */}
+      <section
+        id="admin-section"
+        className="px-4 py-8 bg-slate-900 text-slate-200 mt-8 rounded-t-[40px]"
+      >
+        <div className="text-center mb-6">
+          <h2 className="text-xl font-black text-white flex justify-center items-center gap-2">
+            <Lock size={18} className="text-slate-400" /> Control Center
+          </h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Preview fitur backend untuk manajemen bisnis
+          </p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex bg-slate-800 p-1 rounded-xl mb-6">
+          <button
+            onClick={() => setActiveAdminTab("admin")}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
+              activeAdminTab === "admin"
+                ? "bg-emerald-500 text-white shadow"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            National Admin (GMV)
+          </button>
+          <button
+            onClick={() => setActiveAdminTab("ops")}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
+              activeAdminTab === "ops"
+                ? "bg-indigo-500 text-white shadow"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Campus Ops (Safe Zones)
+          </button>
+        </div>
+
+        {/* Admin Content */}
+        {activeAdminTab === "admin" && (
+          <div className="animate-[fadeIn_0.3s_ease-out]">
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-inner">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                  Vol. Escrow
+                </p>
+                <h3 className="text-xl font-black text-emerald-400">
+                  Rp 142.5M
+                </h3>
+                <p className="text-[10px] text-emerald-500 mt-1 flex items-center gap-1">
+                  <Zap size={10} /> +12% MoM
+                </p>
+              </div>
+              <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-inner">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                  KYC Fallback
+                </p>
+                <h3 className="text-xl font-black text-orange-400">24 Tiket</h3>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Antrean Moderasi Manual
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+              <div className="bg-slate-950 p-3 flex justify-between items-center">
+                <span className="text-xs font-bold text-white">
+                  Manual KYC Moderation
+                </span>
+                <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
+                  Action Req
+                </span>
+              </div>
+              <div className="p-4 flex gap-4">
+                <div className="w-20 h-14 bg-slate-700 rounded-lg flex items-center justify-center text-[8px] text-slate-400 border border-slate-600">
+                  Scan KTM Blur
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-sm text-white">Budi S.</p>
+                  <p className="text-[10px] text-slate-400 leading-tight mt-1">
+                    OCR Confidence 72%. Verifikasi manual diperlukan.
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <button className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] px-3 py-1 rounded font-bold transition">
+                      Approve
+                    </button>
+                    <button className="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-3 py-1 rounded font-bold transition">
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Ops Content */}
+        {activeAdminTab === "ops" && (
+          <div className="animate-[fadeIn_0.3s_ease-out]">
+            <div className="bg-indigo-900/40 p-4 rounded-2xl border border-indigo-500/30 mb-4">
+              <h3 className="font-bold text-indigo-300 text-xs mb-3 flex items-center gap-2 uppercase tracking-wide">
+                <MapPin size={14} /> Safe Zone Heatmap (ITB)
+              </h3>
+              <div className="space-y-2">
+                {SAFE_ZONES.map((z) => (
+                  <div
+                    key={z.id}
+                    className="flex justify-between items-center bg-slate-800/80 p-2.5 rounded-xl border border-slate-700"
+                  >
+                    <span className="text-xs text-slate-200">{z.name}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        z.crowd === "Tinggi"
+                          ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                          : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      }`}
+                    >
+                      {z.crowd} Vol
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-orange-900/20 p-4 rounded-2xl border border-orange-500/30">
+              <h3 className="font-bold text-orange-300 text-xs mb-3 flex items-center gap-2 uppercase tracking-wide">
+                <AlertTriangle size={14} /> Active Dispute
+              </h3>
+              <div className="bg-slate-800 p-3 rounded-xl border border-slate-700">
+                <p className="text-[10px] font-bold text-orange-400 mb-1">
+                  Tiket #DIS-001
+                </p>
+                <p className="text-xs font-semibold text-white">
+                  Komplain Kondisi Barang
+                </p>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Pembeli menolak scan QR serah terima karena barang retak.
+                </p>
+                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs py-2 rounded-lg mt-3 font-bold transition shadow-lg shadow-orange-500/20">
+                  Intervensi & Refund
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* GLOBAL BOTTOM NAVIGATION */}
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 backdrop-blur-lg border-t border-gray-100 flex justify-around p-3 pb-5 z-40 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
+        <button
+          onClick={() => scrollToSection("hero-section")}
+          className="flex flex-col items-center gap-1 text-emerald-500 transition-colors"
+        >
+          <ShoppingBag size={22} className="fill-emerald-100" />
+          <span className="text-[10px] font-bold">Jelajah</span>
+        </button>
+
+        <button className="flex flex-col items-center gap-1 text-gray-400 -mt-6 relative hover:-translate-y-1 transition-transform">
+          <div className="bg-gradient-to-br from-emerald-400 to-teal-500 text-white p-4 rounded-full shadow-xl shadow-emerald-500/40 border-4 border-gray-50 flex items-center justify-center">
+            <Camera size={24} />
+          </div>
+          <span className="text-[10px] font-bold text-gray-600 mt-1">
+            Jual (Al Scan)
+          </span>
+        </button>
+
+        <button
+          onClick={() => scrollToSection("dashboard-section")}
+          className="flex flex-col items-center gap-1 text-gray-400 hover:text-emerald-500 transition-colors"
+        >
+          <div className="relative">
+            <User size={22} />
+            {user.activeTx && (
+              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
+            )}
+          </div>
+          <span className="text-[10px] font-bold">Dasbor</span>
+        </button>
+      </div>
+
+      {/* OVERLAY 1: PRODUCT DETAIL DRAWER */}
+      {activeProduct && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-auto">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setActiveProduct(null)}
+          ></div>
+
+          <div className="relative bg-white w-full max-w-md mx-auto h-[90vh] rounded-t-[40px] shadow-2xl flex flex-col overflow-hidden animate-[slideUp_0.3s_ease-out]">
+            {/* Drawer Handle */}
+            <div className="w-full flex justify-center py-3 bg-white absolute top-0 z-20 rounded-t-[40px]">
+              <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+            </div>
+
+            <button
+              onClick={() => setActiveProduct(null)}
+              className="absolute top-4 right-4 z-20 bg-gray-100 p-2 rounded-full text-gray-600 hover:bg-gray-200"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="overflow-y-auto flex-1 pb-24 hide-scrollbar">
+              {/* 360 Image Area */}
+              <div className="h-72 bg-gray-100 w-full relative">
+                <img
+                  src={activeProduct.image}
+                  className="w-full h-full object-cover"
+                  alt="Product"
+                />
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur flex items-center gap-2">
+                  <Box size={14} /> Geser untuk melihat 360°
+                </div>
+              </div>
+
+              <div className="px-5 pt-6 pb-4 bg-white relative z-10 -mt-4 rounded-t-3xl">
+                <h1 className="text-2xl font-black text-gray-900 leading-tight mb-2">
+                  {activeProduct.title}
+                </h1>
+
+                <div className="flex items-end gap-3 mb-6">
+                  <span className="text-3xl font-black text-emerald-600 tracking-tight">
+                    Rp {activeProduct.price.toLocaleString("id-ID")}
+                  </span>
+                  <span className="text-sm text-gray-400 line-through mb-1 font-medium">
+                    Rp {activeProduct.originalPrice.toLocaleString("id-ID")}
+                  </span>
+                </div>
+
+                {/* AI Price Meter Component */}
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6 flex items-start gap-3">
+                  <div className="bg-blue-500 text-white p-2 rounded-xl shadow-inner mt-0.5">
+                    <Activity size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <p className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+                        AI Price Meter
+                      </p>
+                      <p className="text-[10px] font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
+                        Good Deal
+                      </p>
+                    </div>
+                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden flex shadow-inner">
+                      <div className="h-full bg-green-500 w-[40%]"></div>
+                      <div className="h-full bg-yellow-400 w-[40%]"></div>
+                      <div className="h-full bg-red-500 w-[20%]"></div>
+                    </div>
+                    <p className="text-[10px] text-gray-600 mt-2 leading-relaxed">
+                      Analisis AI: Harga{" "}
+                      <strong>
+                        {activeProduct.price < activeProduct.aiFairPrice
+                          ? "lebih murah"
+                          : "lebih mahal"}
+                      </strong>{" "}
+                      dari harga pasaran wajar (Rp{" "}
+                      {activeProduct.aiFairPrice.toLocaleString("id-ID")}).
+                    </p>
+                  </div>
+                </div>
+
+                {/* Info List */}
+                <div className="mb-6 space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Kondisi</span>
+                    <span className="text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded">
+                      {activeProduct.condition}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Kategori</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {activeProduct.category}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-500">Lokasi COD</span>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 flex items-center gap-1">
+                      <MapPin size={12} /> Safe Zone ({activeProduct.university}
+                      )
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <h3 className="font-bold text-gray-800 mb-2">Deskripsi</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 p-4 rounded-2xl">
+                    {activeProduct.description}
+                  </p>
+                </div>
+
+                {/* Seller Profile Card */}
+                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-2xl bg-white shadow-sm mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-black text-xl shadow-inner">
+                      {activeProduct.seller[0]}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-gray-900">
+                        {activeProduct.seller}
+                      </h4>
+                      <div className="flex items-center gap-1 text-xs text-yellow-500 mt-1 font-bold bg-yellow-50 w-fit px-1.5 py-0.5 rounded">
+                        <Star size={12} fill="currentColor" /> 4.9 (24
+                        Transaksi)
+                      </div>
+                    </div>
+                  </div>
+                  <button className="text-xs bg-gray-900 text-white px-3 py-2 rounded-xl font-bold shadow-md hover:bg-gray-800">
+                    3D Closet
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Floating Action Buttons for Drawer */}
+            <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 p-4 flex gap-3 z-30 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+              <button
+                onClick={() => setNegoBotOpen(true)}
+                className="flex-[1.5] bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-black py-3.5 rounded-2xl flex justify-center items-center gap-2 active:scale-95 transition-all shadow-lg shadow-yellow-400/30"
+              >
+                <MessageSquare size={18} /> Nego AI
+              </button>
+              <button
+                onClick={handleBuyClick}
+                className="flex-[2] bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-500/40 flex justify-center items-center gap-2 active:scale-95 transition-all"
+              >
+                <ShoppingBag size={18} /> Beli Aman
+              </button>
+            </div>
+
+            {/* NESTED DRAWER: NEGO BOT */}
+            {negoBotOpen && (
+              <div className="absolute inset-0 z-40 bg-black/40 flex flex-col justify-end animate-[fadeIn_0.2s_ease-out]">
+                <div className="bg-gray-50 h-[65%] rounded-t-[30px] shadow-2xl flex flex-col animate-[slideUp_0.3s_ease-out]">
+                  {/* Nego Header */}
+                  <div className="p-4 border-b border-yellow-200 flex justify-between items-center bg-yellow-50 rounded-t-[30px]">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-yellow-400 p-2.5 rounded-xl shadow-inner">
+                        <MessageSquare size={18} className="text-yellow-900" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-yellow-900">
+                          Nego-Bot (Auto)
+                        </h3>
+                        <p className="text-[10px] font-medium text-yellow-700">
+                          Tawaran instan disetujui penjual
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setNegoBotOpen(false)}
+                      className="text-yellow-900 p-2 rounded-full bg-yellow-200/50 hover:bg-yellow-200 font-bold"
+                    >
+                      <ChevronDown size={20} />
+                    </button>
+                  </div>
+
+                  {/* Chat Area */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
+                    <div className="flex justify-start">
+                      <div className="max-w-[80%] p-3.5 rounded-2xl rounded-tl-sm text-sm bg-white border border-gray-200 text-gray-800 shadow-sm">
+                        Hai! Harga asli{" "}
+                        <strong className="text-emerald-600">
+                          Rp {activeProduct.price.toLocaleString("id-ID")}
+                        </strong>
+                        . Penjual sudah set batas nego ke AI. Mau tawar berapa?
+                      </div>
+                    </div>
+                    {/* Simulated user message space */}
+                    <div className="flex justify-end opacity-50">
+                      <div className="max-w-[80%] p-3.5 rounded-2xl rounded-tr-sm text-sm bg-emerald-500 text-white shadow-sm">
+                        (Ketik tawaranmu di bawah)
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Input Area */}
+                  <div className="p-4 bg-white border-t border-gray-100 flex gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-bold">
+                        Rp
+                      </span>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        className="w-full bg-gray-100 border-none rounded-xl pl-9 pr-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        alert(
+                          "Simulasi Nego: Deal! Harga diubah menjadi tawaranmu."
+                        );
+                        setNegoBotOpen(false);
+                      }}
+                      className="bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold shadow-md hover:bg-emerald-600"
+                    >
+                      Kirim
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* OVERLAY 2: CHECKOUT & VERIFY FLOW (STEPPER MODAL) */}
+      {checkoutFlowStep > 0 && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-auto">
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() =>
+              checkoutFlowStep === 3 ? null : setCheckoutFlowStep(0)
+            }
+          ></div>
+
+          <div className="bg-white w-[90%] max-w-sm rounded-[32px] overflow-hidden relative z-10 shadow-2xl flex flex-col h-[80vh] max-h-[700px] animate-[popIn_0.3s_ease-out]">
+            {checkoutFlowStep !== 3 && (
+              <div className="p-4 flex items-center border-b border-gray-100 bg-white sticky top-0 z-20">
+                <button
+                  onClick={() => setCheckoutFlowStep(0)}
+                  className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
+                >
+                  <X size={18} />
+                </button>
+                <h2 className="ml-3 font-black text-gray-900 text-lg">
+                  {checkoutFlowStep === 1
+                    ? "Verifikasi KTM"
+                    : "Checkout & Escrow"}
+                </h2>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto bg-gray-50 relative">
+              {/* STEP 1: VERIFY KTM */}
+              {checkoutFlowStep === 1 && (
+                <div className="p-6 flex flex-col items-center justify-center min-h-full">
+                  <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
+                    <ShieldCheck size={32} />
+                  </div>
+                  <h3 className="text-xl font-black text-center mb-2">
+                    Satu Langkah Lagi!
+                  </h3>
+                  <p className="text-center text-sm text-gray-500 mb-8 leading-relaxed">
+                    Sesuai aturan keamanan Campus Safe Zone, kami butuh
+                    verifikasi identitas mahasiswa (AI OCR).
+                  </p>
+
+                  <div className="w-full aspect-[4/3] bg-gray-900 rounded-3xl relative overflow-hidden shadow-2xl flex items-center justify-center border-4 border-gray-800">
+                    <img
+                      src="https://images.unsplash.com/photo-1629904853716-f0bc54eea481?auto=format&fit=crop&w=500&q=80"
+                      alt="Mock KTM"
+                      className="w-full h-full object-cover opacity-40 blur-[1px]"
+                    />
+
+                    {/* Scanning Animation */}
+                    <div className="absolute top-0 left-0 w-full h-2 bg-emerald-400 shadow-[0_0_20px_#34d399] animate-[scan_2s_ease-in-out_infinite]"></div>
+                    <div className="absolute inset-0 border-2 border-emerald-500/50 m-6 rounded-xl"></div>
+
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur px-3 py-1.5 rounded-full text-[10px] text-white font-bold tracking-widest uppercase">
+                      AI Scanning...
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setUser({
+                        ...user,
+                        isVerified: true,
+                        name: "Alya (Verified)",
+                      });
+                      setCheckoutFlowStep(2);
+                    }}
+                    className="w-full bg-emerald-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/30 mt-8 hover:bg-emerald-600 transition"
+                  >
+                    Simulasi: Scan Sukses
+                  </button>
+                </div>
+              )}
+
+              {/* STEP 2: CHECKOUT */}
+              {checkoutFlowStep === 2 && activeProduct && (
+                <div className="p-5 pb-24">
+                  {/* Item Summary */}
+                  <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex gap-4 mb-4">
+                    <img
+                      src={activeProduct.image}
+                      className="w-20 h-20 rounded-xl object-cover"
+                      alt="Item"
+                    />
+                    <div className="flex-1 py-1">
+                      <h3 className="font-bold text-sm text-gray-900 leading-tight line-clamp-2">
+                        {activeProduct.title}
+                      </h3>
+                      <p className="font-black text-emerald-600 mt-2">
+                        Rp {activeProduct.price.toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Safe Zone Selection */}
+                  <h4 className="font-black text-sm mb-3 flex items-center gap-2 text-gray-800">
+                    <MapPin size={16} className="text-emerald-500" /> Lokasi
+                    Serah Terima (Safe Zone)
+                  </h4>
+                  <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-5">
+                    <div className="bg-gray-100 h-32 relative overflow-hidden border-b border-gray-200 flex items-center justify-center">
+                      <div
+                        className="absolute inset-0 opacity-20"
+                        style={{
+                          backgroundImage:
+                            "linear-gradient(#9ca3af 1px, transparent 1px), linear-gradient(90deg, #9ca3af 1px, transparent 1px)",
+                          backgroundSize: "16px 16px",
+                        }}
+                      ></div>
+                      <MapPin
+                        size={36}
+                        className="text-emerald-500 animate-bounce relative z-10 drop-shadow-md"
+                      />
+                    </div>
+                    <div className="p-2 space-y-2">
+                      {SAFE_ZONES.map((zone) => (
+                        <label
+                          key={zone.id}
+                          className="flex items-center gap-3 p-3 rounded-xl border border-transparent cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50 transition-colors"
+                        >
+                          <input
+                            type="radio"
+                            name="zone"
+                            defaultChecked={zone.id === 1}
+                            className="w-4 h-4 accent-emerald-500"
+                          />
+                          <div className="flex-1">
+                            <p className="font-bold text-sm text-gray-900">
+                              {zone.name}
+                            </p>
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              {zone.cctv ? "✅ CCTV Aktif" : "⚠️ Area Publik"} •
+                              Crowd: {zone.crowd}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Escrow Payment */}
+                  <h4 className="font-black text-sm mb-3 flex items-center gap-2 text-gray-800">
+                    <ShieldCheck size={16} className="text-blue-500" />{" "}
+                    Pembayaran (Escrow)
+                  </h4>
+                  <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 text-[10px] text-blue-800 font-medium mb-3 leading-relaxed">
+                    Dana ditahan aman oleh sistem. Penjual baru terima uang
+                    setelah kamu men-scan QR Code serah terima di lokasi.
+                  </div>
+
+                  <div className="bg-white border border-gray-200 rounded-2xl p-2 space-y-1">
+                    <label className="flex items-center gap-3 p-3 rounded-xl border border-transparent cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
+                      <input
+                        type="radio"
+                        name="payment"
+                        defaultChecked
+                        className="w-4 h-4 accent-emerald-500"
+                      />
+                      <span className="font-bold text-sm">
+                        QRIS Auto-Generate
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 rounded-xl border border-transparent cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
+                      <input
+                        type="radio"
+                        name="payment"
+                        className="w-4 h-4 accent-emerald-500"
+                      />
+                      <span className="font-bold text-sm">
+                        Virtual Account Bank
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Sticky Bottom Action inside Modal */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-30">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-xs text-gray-500 font-semibold">
+                        Total Tagihan
+                      </span>
+                      <span className="text-lg font-black text-gray-900">
+                        Rp{" "}
+                        {(activeProduct.price + 2500).toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() =>
+                        completeCheckout(activeProduct, SAFE_ZONES[0])
+                      }
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 rounded-xl shadow-lg shadow-emerald-500/30 flex justify-center items-center gap-2 transition-transform active:scale-95"
+                    >
+                      Bayar & Kunci Transaksi <CheckCircle size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: SUCCESS ANIMATION */}
+              {checkoutFlowStep === 3 && (
+                <div className="absolute inset-0 bg-emerald-500 text-white flex flex-col items-center justify-center z-50 p-6 text-center">
+                  <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-2xl animate-[bounceIn_0.5s_ease-out]">
+                    <CheckCircle size={50} className="text-emerald-500" />
+                  </div>
+                  <h2 className="text-2xl font-black mb-2">
+                    Berhasil Dikunci!
+                  </h2>
+                  <p className="text-emerald-100 text-sm leading-relaxed max-w-[250px]">
+                    Dana diamankan di Escrow. Temui penjual di Safe Zone untuk
+                    serah terima.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OVERLAY 3: QR SCANNER (HANDOVER) */}
+      {qrScannerOpen && (
+        <div className="fixed inset-0 bg-gray-900 z-[70] flex flex-col items-center justify-center pointer-events-auto">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-800 to-black opacity-80"></div>
+
+          <button
+            onClick={() => setQrScannerOpen(false)}
+            className="absolute top-6 right-6 p-3 bg-white/10 backdrop-blur rounded-full text-white hover:bg-white/20 transition z-10"
+          >
+            <X size={24} />
+          </button>
+
+          <div className="relative z-10 text-center px-6">
+            <h2 className="text-2xl font-black text-white mb-2 tracking-tight">
+              Pindai QR Penjual
+            </h2>
+            <p className="text-sm text-gray-400 mb-10 max-w-[280px] mx-auto leading-relaxed">
+              Pastikan barang sesuai kondisi. Pindai layar HP penjual untuk
+              melepas dana Escrow.
+            </p>
+
+            <div className="w-64 h-64 mx-auto border-4 border-emerald-500 border-dashed rounded-[40px] relative overflow-hidden flex items-center justify-center bg-gray-800/30 backdrop-blur-sm shadow-[0_0_50px_rgba(16,185,129,0.2)]">
+              {/* Scanner Line */}
+              <div className="w-full h-1.5 bg-emerald-400 shadow-[0_0_25px_#34d399] absolute top-1/2 animate-[scan_1.5s_ease-in-out_infinite]"></div>
+              <QrCode size={100} className="text-emerald-500/20" />
+            </div>
+
+            <button
+              onClick={completeQRScan}
+              className="mt-12 bg-white text-gray-900 font-black py-4 px-8 rounded-full shadow-xl shadow-white/10 hover:scale-105 transition-transform active:scale-95"
+            >
+              Simulasi: Berhasil Scan
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes bounceIn { 0% { transform: scale(0); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scan { 0% { transform: translateY(-100px); } 50% { transform: translateY(100px); } 100% { transform: translateY(-100px); } }
+      `}</style>
+    </div>
+  );
+}
