@@ -250,7 +250,8 @@ export default function GakCintaLagiApp() {
               Barang bekas kampus terverifikasi
             </p>
           </div>
-          <button className="text-emerald-500 font-medium text-xs flex items-center bg-emerald-50 Gitpx-3 py-1.5 rounded-full">
+          {/* SEBELUMNYA (ADA TYPO "Gitpx-3") */}
+<button className="text-emerald-500 font-medium text-xs flex items-center bg-emerald-50 Gitpx-3 py-1.5 rounded-full">
             <SlidersHorizontal size={12} className="mr-1" /> Filter
           </button>
         </div>
